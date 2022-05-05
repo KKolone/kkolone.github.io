@@ -20,15 +20,15 @@
     var CONFIG = {"hostname":"example.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="介绍如何将容器运行时从docker更换到containerd">
+  <meta name="description" content="k8s1.24版本正式移除了对docker的支持，开始转而使用containerd作为容器运行时，本文介绍了如何从docker切换到新的containerd容器运行时。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="更换容器运行时">
 <meta property="og:url" content="http://example.com/2022/05/04/%E6%9B%B4%E6%8D%A2%E5%AE%B9%E5%99%A8%E8%BF%90%E8%A1%8C%E6%97%B6/index.html">
 <meta property="og:site_name" content="qzytwway&#39;s blog">
-<meta property="og:description" content="介绍如何将容器运行时从docker更换到containerd">
+<meta property="og:description" content="k8s1.24版本正式移除了对docker的支持，开始转而使用containerd作为容器运行时，本文介绍了如何从docker切换到新的containerd容器运行时。">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-05-04T13:50:03.000Z">
-<meta property="article:modified_time" content="2022-05-04T13:54:04.276Z">
+<meta property="article:modified_time" content="2022-05-05T14:58:59.836Z">
 <meta property="article:author" content="qzytwway">
 <meta property="article:tag" content="containerd">
 <meta name="twitter:card" content="summary">
@@ -211,10 +211,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2022-05-04 21:50:03 / Modified: 21:54:04" itemprop="dateCreated datePublished" datetime="2022-05-04T21:50:03+08:00">2022-05-04</time>
+              <time title="Created: 2022-05-04 21:50:03" itemprop="dateCreated datePublished" datetime="2022-05-04T21:50:03+08:00">2022-05-04</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-05-05 22:58:59" itemprop="dateModified" datetime="2022-05-05T22:58:59+08:00">2022-05-05</time>
+              </span>
 
           
 
@@ -227,8 +233,52 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>介绍如何将容器运行时从docker更换到containerd</p>
+        <p>k8s1.24版本正式移除了对docker的支持，开始转而使用containerd作为容器运行时，本文介绍了如何从docker切换到新的containerd容器运行时。</p>
 <span id="more"></span>
+
+<h1 id="维护节点"><a href="#维护节点" class="headerlink" title="维护节点"></a>维护节点</h1><p>首先标记需要切换的节点为维护模式，强制驱逐节点上正在运行的 Pod，这样可以最大程度降低切换过程中影响应用的正常运行，比如我们先将 node1 节点切换到 containerd。</p>
+<p>首先使用 <code>kubectl cordon</code> 命令将 node1 节点标记为 <code>unschedulable</code> 不可调度状态：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">#</span><span class="language-bash">将node1标记为unschedulable</span></span><br><span class="line">[root@master1 ~]# kubectl cordon node1</span><br><span class="line">node/node1 cordoned</span><br><span class="line">[root@master1 ~]# kubectl get node</span><br><span class="line">NAME      STATUS                     ROLES                  AGE   VERSION</span><br><span class="line">master1   Ready                      control-plane,master   12d   v1.23.6</span><br><span class="line">master2   Ready                      control-plane,master   12d   v1.23.6</span><br><span class="line">master3   Ready                      control-plane,master   12d   v1.23.6</span><br><span class="line">node1     Ready,SchedulingDisabled   &lt;none&gt;                 12d   v1.23.6</span><br></pre></td></tr></table></figure>
+
+<p>执行完上面的命令后，node1 节点变成了一个 <code>SchedulingDisabled</code> 状态，表示不可调度，这样新创建的 Pod 就不会调度到当前节点上来了。</p>
+<p>接下来维护 node1 节点，使用 <code>kubectl drain</code> 命令来维护节点并驱逐节点上的 Pod：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">#</span><span class="language-bash">维护 node1 节点，驱逐 Pod</span></span><br><span class="line">[root@master1 ~]# kubectl drain node1 --ignore-daemonsets</span><br><span class="line">node/node1 already cordoned</span><br><span class="line">WARNING: ignoring DaemonSet-managed Pods: kube-system/kube-flannel-ds-mzdgl, kube-system/kube-proxy-vddh9, lens-metrics/node-exporter-2g4hr</span><br><span class="line">evicting pod &quot;kiali-85c8cdd5b5-27cwv&quot;</span><br><span class="line">evicting pod &quot;jenkins-587b78f5cd-9gvn8&quot;</span><br><span class="line">evicting pod &quot;argocd-application-controller-0&quot;</span><br><span class="line">pod/argocd-application-controller-0 evicted</span><br><span class="line">pod/kiali-85c8cdd5b5-27cwv evicted</span><br><span class="line">pod/jenkins-587b78f5cd-9gvn8 evicted</span><br><span class="line">node/node1 evicted</span><br></pre></td></tr></table></figure>
+
+<p>上面的命令会强制将 node1 节点上的 Pod 进行驱逐，我们加了一个 <code>--ignore-daemonsets</code> 的参数可以用来忽略 DaemonSet 控制器管理的 Pods，因为这些 Pods 不用驱逐到其他节点去，当节点驱逐完成后接下来我们就可以来对节点进行维护操作了，除了切换容器运行时可以这样操作，比如我们需要变更节点配置、升级内核等操作的时候都可以先将节点进行驱逐，然后再进行维护。</p>
+<h1 id="切换-containerd"><a href="#切换-containerd" class="headerlink" title="切换 containerd"></a>切换 containerd</h1><p>接下来停掉 docker、containerd 和 kubelet，请注意看，之前的驱逐操作是在master节点上操作，现在是要到node1节点上操作。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[root@node1 ~]# systemctl stop kubelet</span><br><span class="line">[root@node1 ~]# systemctl stop docker</span><br><span class="line">[root@node1 ~]# systemctl stop containerd</span><br></pre></td></tr></table></figure>
+
+<p>因为我们安装的 Docker 默认安装使用了 containerd 作为后端的容器运行时，所以不需要单独安装 containerd 了，当然你也可以将 Docker 和 containerd 完全卸载掉，然后重新安装，这里我们选择直接使用之前安装的 containerd。</p>
+<p>因为 containerd 中默认已经实现了 CRI，但是是以 plugin 的形式配置的，以前 Docker 中自带的 containerd 默认是将 CRI 这个插件禁用掉了的（使用配置 <code>disabled_plugins = [&quot;cri&quot;]</code>），所以这里我们重新生成默认的配置文件来覆盖掉：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[root@node1 ~]# containerd config default &gt; /etc/containerd/config.toml</span><br></pre></td></tr></table></figure>
+
+<p>前面我们已经介绍过上面的配置文件了，首先我们修改默认的 pause 镜像为国内的地址，替换 <code>[plugins.&quot;io.containerd.grpc.v1.cri&quot;]</code> 下面的 <code>sandbox_image</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[plugins.&quot;io.containerd.grpc.v1.cri&quot;]</span><br><span class="line">	sandbox_image = &quot;registry.aliyuncs.com/google_containers/pause:3.6&quot;</span><br><span class="line">	....</span><br></pre></td></tr></table></figure>
+
+<p>修改containerd的systemGroup</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[plugins.&quot;io.containerd.grpc.v1.cri&quot;.containerd.runtimes.runc.options]</span><br><span class="line">	SystemdCgroup = true</span><br></pre></td></tr></table></figure>
+
+<p>同样再配置下镜像仓库的加速器地址：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[plugins.&quot;io.containerd.grpc.v1.cri&quot;.registry]</span><br><span class="line">	[plugins.&quot;io.containerd.grpc.v1.cri&quot;.registry.mirrors]</span><br><span class="line">		[plugins.&quot;io.containerd.grpc.v1.cri&quot;.registry.mirrors.&quot;docker.io&quot;]</span><br><span class="line">          endpoint = [&quot;https://hd1esep4.mirror.aliyuncs.com&quot;]</span><br><span class="line">        [plugins.&quot;io.containerd.grpc.v1.cri&quot;.registry.mirrors.&quot;k8s.gcr.io&quot;]</span><br><span class="line">          endpoint = [&quot;https://registry.aliyuncs.com/k8sxio&quot;]</span><br></pre></td></tr></table></figure>
+
+<p>接下来修改 kubelet 配置，将容器运行时配置为 containerd，打开 <code>/etc/sysconfig/kubelet</code> 文件，在该文件中可以添加一些额外的 kubelet 启动参数，由于我在之前的高可用文章中已经配过kublelet的systemd，所以配置如下所示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KUBELET_EXTRA_ARGS=&quot;--cgroup-driver=systemd --container-runtime=remote --container-runtime-endpoint=unix:///run/containerd/containerd.sock&quot;</span><br></pre></td></tr></table></figure>
+
+<p>上面的配置中我们增加了两个参数，<code>--container-runtime</code> 参数是用来指定使用的容器运行时的，可选值为 <code>docker</code> 或者 <code>remote</code>，默认是 <code>docker</code>，由于我们这里使用的是 containerd 这种容器运行时，所以配置为 <code>remote</code> 值（也就是除 <code>docker</code> 之外的容器运行时都应该指定为 <code>remote</code>），然后第二个参数 <code>--container-runtime-endpoint</code> 是用来指定远程的运行时服务的 endpiont 地址的，在 Linux 系统中一般都是使用 unix 套接字的形式，比如这里我们就是指定连接 containerd 的套接字地址 <code>unix:///run/containerd/containerd.sock</code>。</p>
+<p>配置完成后重启 containerd 和 kubelet 即可：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[root@node1 ~]# systemctl daemon-reload</span><br><span class="line">[root@node1 ~]# systemctl restart containerd</span><br><span class="line">[root@node1 ~]# systemctl restart kubelet</span><br></pre></td></tr></table></figure>
+
+<p>重启完成后查看节点状态是否正常：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[root@master1 ~]# kubectl get nodes -o wide</span><br><span class="line">[root@master1 ~]# kubectl get node -owide</span><br><span class="line">NAME      STATUS                     ROLES                  AGE   VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                KERNEL-VERSION                CONTAINER-RUNTIME</span><br><span class="line">master1   Ready                      control-plane,master   12d   v1.23.6   192.168.50.71   &lt;none&gt;        CentOS Linux 7 (Core)   5.4.190-1.el7.elrepo.x86_64   containerd://1.5.11</span><br><span class="line">master2   Ready                      control-plane,master   12d   v1.23.6   192.168.50.72   &lt;none&gt;        CentOS Linux 7 (Core)   5.4.190-1.el7.elrepo.x86_64   containerd://1.5.11</span><br><span class="line">master3   Ready                      control-plane,master   12d   v1.23.6   192.168.50.73   &lt;none&gt;        CentOS Linux 7 (Core)   5.4.190-1.el7.elrepo.x86_64   containerd://1.5.11</span><br><span class="line">node1     Ready,SchedulingDisabled   &lt;none&gt;                 12d   v1.23.6   192.168.50.74   &lt;none&gt;        CentOS Linux 7 (Core)   5.4.190-1.el7.elrepo.x86_64   containerd://1.5.11</span><br></pre></td></tr></table></figure>
+
+<p>获取节点的时候加上 <code>-o wide</code> 可以查看节点的更多信息，从上面对比可以看到 node1 节点的容器运行时已经切换到 <code>containerd://1.5.11</code> 了</p>
+<p>最后把 node1 节点重新加回到集群中来允许调度 Pod 资源：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">[root@master1 ~]# kubectl uncordon node1</span><br><span class="line">node/node1 uncordoned</span><br><span class="line">[root@master1 ~]# kubectl get nodes</span><br><span class="line">NAME      STATUS   ROLES                  AGE   VERSION</span><br><span class="line">master1   Ready    control-plane,master   12d   v1.23.6</span><br><span class="line">master2   Ready    control-plane,master   12d   v1.23.6</span><br><span class="line">master3   Ready    control-plane,master   12d   v1.23.6</span><br><span class="line">node1     Ready    &lt;none&gt;                 12d   v1.23.6</span><br></pre></td></tr></table></figure>
+
+<p>用同样的方法再去处理其他节点即可将整个集群切换成容器运行时 containerd 了。</p>
+<p>切换到新的容器运行时后将无法再使用docker.sock创建镜像，但是可以使用containerd官方的nerdctl进行管理，具体查看下方链接。</p>
+<p><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=MzU4MjQ0MTU4Ng==&mid=2247495107&idx=1&sn=d8e59e4f1c92b17381c48c780b9dd309&chksm=fdbae2decacd6bc832a9efcf7859c3129d18ccaf92ebf394355772354a84520ca2015d1a8446&scene=178&cur_album_id=1999536760283791361#rd">可以像 Docker 一样方便的使用 Containerd 吗？</a></p>
+
     </div>
 
     
@@ -308,6 +358,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BB%B4%E6%8A%A4%E8%8A%82%E7%82%B9"><span class="nav-number">1.</span> <span class="nav-text">维护节点</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%87%E6%8D%A2-containerd"><span class="nav-number">2.</span> <span class="nav-text">切换 containerd</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
