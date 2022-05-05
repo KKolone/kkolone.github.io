@@ -1,30 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>制作jenkins slave镜像</title>
-    <url>/2022/05/01/%E5%88%B6%E4%BD%9Cjenkins-slave%E9%95%9C%E5%83%8F/</url>
-    <content><![CDATA[<p>jenkins-slave主要用作为jenkins构建时使用，当有构建任务时，会将构建任务交给jenkins-slave去做，master节点作为任务调度节点。下面介绍一下镜像制作流程。</p>
-<span id="more"></span>
-
-<p>构建镜像需要的包以及软件如下图：<br><img src="https://raw.githubusercontent.com/KKolone/img/main/img/image-20220504211905845.png" alt="image-20220504211905845"></p>
-<p>已经打成tar包供下载，下载链接如下。</p>
-<figure class="highlight txt"><table><tr><td class="code"><pre><span class="line">链接：https://pan.baidu.com/s/1T2uBx3fm7FlnFmiFd5aGIA </span><br><span class="line">提取码：6666</span><br></pre></td></tr></table></figure>
-
-<p>Dockerfile</p>
-<figure class="highlight txt"><table><tr><td class="code"><pre><span class="line">FROM jenkins/inbound-agent</span><br><span class="line"></span><br><span class="line">USER root</span><br><span class="line"></span><br><span class="line">WORKDIR /home/jenkins</span><br><span class="line"></span><br><span class="line">ADD  apache-maven-3.8.5-bin.tar.gz /usr/local/</span><br><span class="line">COPY helm kubectl /usr/bin/</span><br><span class="line">COPY settings.xml /usr/local/apache-maven-3.8.5/conf/settings.xml</span><br><span class="line"></span><br><span class="line">ENV MVN_HOME=/usr/local/apache-maven-3.8.5</span><br><span class="line">ENV PATH=$&#123;PATH&#125;:$&#123;JAVA_HOME&#125;/bin:$&#123;MVN_HOME&#125;/bin</span><br><span class="line"></span><br><span class="line">ENTRYPOINT [&quot;jenkins-slave&quot;]</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>使用docerkbuile命令构建镜像，之后可以使用docker tag更改镜像名上传到阿里云</p>
-<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">docker build -t my-jenkins-slave:v1 .</span><br></pre></td></tr></table></figure>
-
-<p>起一个容器测试jdk跟mvn命令是否可用</p>
-<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">➜  slave docker run -it --rm registry.cn-hangzhou.aliyuncs.com/wqzy_k8s_images/jenkins-slave:v1 /bin/bash</span><br><span class="line">root@0b1807c6b445:/home/jenkins# mvn -v</span><br><span class="line">Apache Maven 3.8.5 (3599d3414f046de2324203b78ddcf9b5e4388aa0)</span><br><span class="line">Maven home: /usr/local/apache-maven-3.8.5</span><br><span class="line">Java version: 11.0.13, vendor: Eclipse Adoptium, runtime: /opt/java/openjdk</span><br><span class="line">Default locale: en, platform encoding: UTF-8</span><br><span class="line">OS name: &quot;linux&quot;, version: &quot;3.10.0-1160.el7.x86_64&quot;, arch: &quot;amd64&quot;, family: &quot;unix&quot;</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# java -version</span><br><span class="line">openjdk version &quot;11.0.13&quot; 2021-10-19</span><br><span class="line">OpenJDK Runtime Environment Temurin-11.0.13+8 (build 11.0.13+8)</span><br><span class="line">OpenJDK 64-Bit Server VM Temurin-11.0.13+8 (build 11.0.13+8, mixed mode)</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# helm version</span><br><span class="line">version.BuildInfo&#123;Version:&quot;v3.8.1&quot;, GitCommit:&quot;5cb9af4b1b271d11d7a97a71df3ac337dd94ad37&quot;, GitTreeState:&quot;clean&quot;, GoVersion:&quot;go1.17.5&quot;&#125;</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# kubectl version</span><br><span class="line">Client Version: version.Info&#123;Major:&quot;1&quot;, Minor:&quot;23&quot;, GitVersion:&quot;v1.23.1&quot;, GitCommit:&quot;86ec240af8cbd1b60bcc4c03c20da9b98005b92e&quot;, GitTreeState:&quot;clean&quot;, BuildDate:&quot;2021-12-16T11:41:01Z&quot;, GoVersion:&quot;go1.17.5&quot;, Compiler:&quot;gc&quot;, Platform:&quot;linux/amd64&quot;&#125;</span><br><span class="line">The connection to the server localhost:8080 was refused - did you specify the right host or port?</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-]]></content>
-      <tags>
-        <tag>jenkins</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>K8s+Jenkins+gitea+Harbor实现DevOps</title>
     <url>/2022/05/04/K8s+Jenkins+gitea+Harbor%E5%AE%9E%E7%8E%B0DevOps/</url>
     <content><![CDATA[<p>介绍了如何使用jenkins+gitea+harbor+k8s实现简单的devops。</p>
@@ -103,6 +79,30 @@
       <tags>
         <tag>k8s</tag>
         <tag>devops</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>制作jenkins slave镜像</title>
+    <url>/2022/05/01/%E5%88%B6%E4%BD%9Cjenkins-slave%E9%95%9C%E5%83%8F/</url>
+    <content><![CDATA[<p>jenkins-slave主要用作为jenkins构建时使用，当有构建任务时，会将构建任务交给jenkins-slave去做，master节点作为任务调度节点。下面介绍一下镜像制作流程。</p>
+<span id="more"></span>
+
+<p>构建镜像需要的包以及软件如下图：<br><img src="https://raw.githubusercontent.com/KKolone/img/main/img/image-20220504211905845.png" alt="image-20220504211905845"></p>
+<p>已经打成tar包供下载，下载链接如下。</p>
+<figure class="highlight txt"><table><tr><td class="code"><pre><span class="line">链接：https://pan.baidu.com/s/1T2uBx3fm7FlnFmiFd5aGIA </span><br><span class="line">提取码：6666</span><br></pre></td></tr></table></figure>
+
+<p>Dockerfile</p>
+<figure class="highlight txt"><table><tr><td class="code"><pre><span class="line">FROM jenkins/inbound-agent</span><br><span class="line"></span><br><span class="line">USER root</span><br><span class="line"></span><br><span class="line">WORKDIR /home/jenkins</span><br><span class="line"></span><br><span class="line">ADD  apache-maven-3.8.5-bin.tar.gz /usr/local/</span><br><span class="line">COPY helm kubectl /usr/bin/</span><br><span class="line">COPY settings.xml /usr/local/apache-maven-3.8.5/conf/settings.xml</span><br><span class="line"></span><br><span class="line">ENV MVN_HOME=/usr/local/apache-maven-3.8.5</span><br><span class="line">ENV PATH=$&#123;PATH&#125;:$&#123;JAVA_HOME&#125;/bin:$&#123;MVN_HOME&#125;/bin</span><br><span class="line"></span><br><span class="line">ENTRYPOINT [&quot;jenkins-slave&quot;]</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>使用docerkbuile命令构建镜像，之后可以使用docker tag更改镜像名上传到阿里云</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">docker build -t my-jenkins-slave:v1 .</span><br></pre></td></tr></table></figure>
+
+<p>起一个容器测试jdk跟mvn命令是否可用</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">➜  slave docker run -it --rm registry.cn-hangzhou.aliyuncs.com/wqzy_k8s_images/jenkins-slave:v1 /bin/bash</span><br><span class="line">root@0b1807c6b445:/home/jenkins# mvn -v</span><br><span class="line">Apache Maven 3.8.5 (3599d3414f046de2324203b78ddcf9b5e4388aa0)</span><br><span class="line">Maven home: /usr/local/apache-maven-3.8.5</span><br><span class="line">Java version: 11.0.13, vendor: Eclipse Adoptium, runtime: /opt/java/openjdk</span><br><span class="line">Default locale: en, platform encoding: UTF-8</span><br><span class="line">OS name: &quot;linux&quot;, version: &quot;3.10.0-1160.el7.x86_64&quot;, arch: &quot;amd64&quot;, family: &quot;unix&quot;</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# java -version</span><br><span class="line">openjdk version &quot;11.0.13&quot; 2021-10-19</span><br><span class="line">OpenJDK Runtime Environment Temurin-11.0.13+8 (build 11.0.13+8)</span><br><span class="line">OpenJDK 64-Bit Server VM Temurin-11.0.13+8 (build 11.0.13+8, mixed mode)</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# helm version</span><br><span class="line">version.BuildInfo&#123;Version:&quot;v3.8.1&quot;, GitCommit:&quot;5cb9af4b1b271d11d7a97a71df3ac337dd94ad37&quot;, GitTreeState:&quot;clean&quot;, GoVersion:&quot;go1.17.5&quot;&#125;</span><br><span class="line"></span><br><span class="line">root@0b1807c6b445:/home/jenkins# kubectl version</span><br><span class="line">Client Version: version.Info&#123;Major:&quot;1&quot;, Minor:&quot;23&quot;, GitVersion:&quot;v1.23.1&quot;, GitCommit:&quot;86ec240af8cbd1b60bcc4c03c20da9b98005b92e&quot;, GitTreeState:&quot;clean&quot;, BuildDate:&quot;2021-12-16T11:41:01Z&quot;, GoVersion:&quot;go1.17.5&quot;, Compiler:&quot;gc&quot;, Platform:&quot;linux/amd64&quot;&#125;</span><br><span class="line">The connection to the server localhost:8080 was refused - did you specify the right host or port?</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <tags>
+        <tag>jenkins</tag>
       </tags>
   </entry>
   <entry>
